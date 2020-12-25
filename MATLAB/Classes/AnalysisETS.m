@@ -24,9 +24,10 @@ classdef AnalysisETS
         end
         
         % interleave the DUT data
-        function self = InterlaceData(self,DUT)            
+        function self = InterlaceData(self,DUT)
             len = length(DUT.data);
-            fnRes = fieldnames(DUT.data(1).Results);        
+            % interleave results
+            fnRes = fieldnames(DUT.data(1).Results);
             for i = 1:numel(fnRes)
                 disp(fnRes{i})
                 if fnRes{i} ~= "FE" && fnRes{i} ~= "RFE"
@@ -34,23 +35,50 @@ classdef AnalysisETS
                     for ii = 1:numel(fnType)
                         M = zeros(length(DUT.data(1).Results.(fnRes{i}).(fnType{ii})),len);
                         for j = 1:len
-                            M(:,j) = DUT.data(j).Results.(fnRes{i}).(fnType{ii});                            
+                            M(:,j) = DUT.data(j).Results.(fnRes{i}).(fnType{ii});
                         end
                         dim = size(M); dim = dim(1)*dim(2);
                         self.data.Results.(fnRes{i}).(fnType{ii})=reshape(M',[dim 1]);
-                    end                    
+                    end
                 else
-                   M = zeros(length(DUT.data(1).Results.(fnRes{i})),len);
-                   for j = 1:len
-                       M(:,j) = DUT.data(j).Results.(fnRes{i});
-                   end
-                   dim = size(M); dim = dim(1)*dim(2);
-                   self.data.Results.(fnRes{i})=reshape(M',[dim 1]);
+                    M = zeros(length(DUT.data(1).Results.(fnRes{i})),len);
+                    for j = 1:len
+                        M(:,j) = DUT.data(j).Results.(fnRes{i});
+                    end
+                    dim = size(M); dim = dim(1)*dim(2);
+                    self.data.Results.(fnRes{i})=reshape(M',[dim 1]);
                 end
-                 
+                
             end
+            % interleave PMU reports
+            fnRep = fieldnames(DUT.data(1).PMU);
+            for i = 1:numel(fnRep)
+                disp(fnRep)
+                M = zeros(length(DUT.data(i).PMU.(fnRep{i})),len);
+                for j = 1:len
+                    M(:,j) =DUT.data(j).PMU.(fnRep{i});
+                end
+                dim = size(M); dim = dim(1)*dim(2);
+                self.data.PMU.(fnRep{i})=reshape(M',[dim 1]);
+            end
+            
+            % interleave reference values 
+            fnRep = fieldnames(DUT.data(1).REF);
+            for i = 1:numel(fnRep)
+                disp(fnRep)
+                M = zeros(length(DUT.data(i).REF.(fnRep{i})),len);
+                for j = 1:len
+                    M(:,j) =DUT.data(j).REF.(fnRep{i});
+                end
+                dim = size(M); dim = dim(1)*dim(2);
+                self.data.REF.(fnRep{i})=reshape(M',[dim 1]);
+            end            
         end
+        
+        
+        
     
+        
             
                     
     end
