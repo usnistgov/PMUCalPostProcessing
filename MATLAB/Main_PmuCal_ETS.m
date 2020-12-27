@@ -9,4 +9,4 @@ DUT.readParams;
 
 ETS = AnalysisETS;
 ETS = ETS.EtsTimestamps(DUT,0.002);
-ETS = ETS.InterlaceData(DUT);
+ETS = ETS.InterleaveData(DUT);
