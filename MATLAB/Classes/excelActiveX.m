@@ -310,14 +310,13 @@ classdef excelActiveX < handle
         % The function returns the address where data was written to in
         % 'A1'-format.
         
-        function addr = WriteData(self,data,varargin)
+        function WriteData(self,data,varargin)
             % is the data a handle to a figure?
             try
                 isFigure = (ishandle(data) & strcmp(get(data,'type'),'figure'));
             catch
                 isFigure = false;
             end
-            disp(isFigure);
             
             % It's a figure.
             if isFigure
@@ -325,20 +324,25 @@ classdef excelActiveX < handle
                 if isempty(varargin)
                     addr = 'A1';
                 elseif ischar(varargin{1})
-                    addr = XRangeAddress([1,1],varargin{1});
+                    %addr = XRangeAddress([1,1],varargin{1});
+                    addr = varargin{1};
                 end
                 % copy content of figure to clipboard using hgexport
-                hgexport(data,'-clipboard');
+                % This will export the figure using the size shown on the screen
+                style = hgexport('factorystyle'); %g et the style
+                style.Resolution = 0;   % Resolution = 0 meanst use the screen resolution
+                hgexport(data,'-clipboard',style);
                 % paste clipboard into hSheets
                 try
-                    self.hSheets.Paste(self.hSheets.Range(addr));
+                    self.hSheet.Paste(self.hSheet.Range(addr));
                 catch ME
-                    msg = 'hSheets is not a valid handle to an Excel worksheet.';
+                    msg = 'hSheet is not a valid handle to an Excel worksheet.';
                     ME  = MException(ME.identifier,[ME.message,msg]);
                     throw(ME);
                 end
                 % It's a table.
             elseif isa(data,'table')
+                self.hSheet.Value(self.hSheet.Range(addr)) = data;
             end
             
             

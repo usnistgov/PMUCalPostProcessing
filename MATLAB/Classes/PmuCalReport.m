@@ -16,7 +16,16 @@ classdef PmuCalReport < handle
         vNom = 70
         iNom = 5
         Fs = 50
+        F0 = 50
         ResultType
+        
+        % figure default sizes
+        figPos = [1664 1848 360 250];   % figure position
+        axPos = [0.1 0.15 0.6 0.75];     % axis position
+        lgdPos = [0.71 0.425 0.27 0.2475]; % legend position
+        
+        specifications %specifications read from .xml file for the current PMU configuration
+
         
         
     end
@@ -40,6 +49,8 @@ classdef PmuCalReport < handle
                         self.iNom = varargin{i+1};
                     case 'Fs'
                         self.Fs = varargin{i+1};
+                    case 'F0'
+                        self.F0 = varargin{i+1};
                     case 'Reset'    % delete the .ini file
                         b = varargin{i+1};
                         if b=="t" || b=="T"|| b=="true" || b=="True"
@@ -73,7 +84,8 @@ classdef PmuCalReport < handle
         % get two cell arrays of all the raw data files and parameter files from the folder
         % for one configuration
         function self = getResultsFileList(self)
-            rawDataPath = uigetdir(self.resultPath,'Choose the folder of all results from one PMU configuration');
+            prompt = sprintf('Choose the folder of all results from F0 = %d, Fs = %', self.F0, self.Fs);
+            rawDataPath = uigetdir(self.resultPath,prompt);
             paramNames = {};
             dataNames = self.getfn(rawDataPath,'.csv');
             %for i = 1:numel(dataNames)
@@ -88,7 +100,22 @@ classdef PmuCalReport < handle
             end
             self.paramFiles = paramNames;
             self.dataFiles = dataNames;
-            self.PmuClass = questdlg('M or P Class?','M or P','M','P','M');
+            
+          
+            prompt = sprintf('Choose the Class for selected F0 = %d, Fs = %d results',self.F0,self.Fs);
+            self.PmuClass = questdlg(prompt,'Choose PMU Class','M','P','M');
+            
+            % getting the specifications for the selected PMU configuration
+            absPath = mfilename('fullpath');
+            absPath = extractBefore(absPath,'\MATLAB');
+            relPath = sprintf('Spec_%dF0_%dFs_%s.csv',self.F0,self.Fs,self.PmuClass);
+            absPath = fullfile(absPath,'Specifications',relPath);
+            try
+                self.specifications = readtable(absPath);
+            catch
+                error ('Failed to read  specifications file %s,',absPath);
+            end
+                                   
             
             % TODO: Update the .ini file with the latest Raw Data Path
                         
@@ -161,7 +188,41 @@ classdef PmuCalReport < handle
             self.hExcel.Save;
             
         end
+        
+        %----------------------------------------
+        % loop through the sheets and create a set of plots for each sheet.
+        function plotExcelAnalysis(self)
+            
+           nSheets = self.hExcel.hSheets.Count;
+           for i = nSheets:-1:1
+              self.hExcel.ActivateSheet(i);
+              sheetName = self.hExcel.hSheet.Name;
+              T = readtable(self.ReportFile,'Sheet',sheetName,'PreserveVariableNames',true);
+              Lim = self.getLimitsFromSheetName(sheetName);
+              
+              % Create a new sheet 
+              self.hExcel.NewSheet(strcat(sheetName,' plots'))              
+              fig = self.plotVoltageTVE(T,Lim(1));
+              self.hExcel.WriteData(fig,'B2')
+              close(fig)
+              fig = self.plotCurrentTVE(T,Lim(1));
+              self.hExcel.WriteData(fig,'H2')
+               close(fig)
+              fig = self.plotFrequencyError(T,Lim(2));
+              self.hExcel.WriteData(fig,'B16')
+              close(fig)
+              fig = self.plotRocofError(T,Lim(3));
+              self.hExcel.WriteData(fig,'H16')
+              close(fig)
+            
+              
+           end
+        end
+       
+        
+        
     end
+    
     
     %% Static Methods
     methods(Static)   
@@ -365,7 +426,7 @@ classdef PmuCalReport < handle
     
 
     %% private methods    
-    methods (Access = private)
+    methods (Access = public)
         
         %-----------------------
         % from a parameter file, return the name of the excel sheet to write
@@ -556,7 +617,241 @@ classdef PmuCalReport < handle
         end
     end
     
+    % Create a formatted plot of the Voltage TVE
+    function fig = plotVoltageTVE(self,T,limit)
+        
+        lstVoltage = ["MaxTVE_VA" "MaxTVE_VB" "MaxTVE_VC" "MaxTVE_Vp"];
+
+        % Create figure
+        fig = figure;
+        set(fig,'Position',self.figPos);
+        
+        % X and Y data
+        X1 = T{:,1};
+        YMatrix1 = zeros(4,size(T,1));
+        for ii = 1:numel(lstVoltage)
+            YMatrix1(ii,:) = T{:,lstVoltage(ii)};
+        end
+
+        
+        % Create axes
+        axes1 = axes('Parent',fig,...
+            'Position',self.axPos, 'YGrid', 'on');        
+        hold(axes1,'on');
+        
+        % Create multiple lines using matrix input to plot
+        plot1 = plot(X1,YMatrix1,'LineWidth',2,'Parent',axes1);
+        set(plot1(1),'DisplayName','MaxTVE\_VA');
+        set(plot1(2),'DisplayName','MaxTVE\_VB');
+        set(plot1(3),'DisplayName','MaxTVE\_VC');
+        set(plot1(4),'DisplayName','MaxTVE\_V+');
+        
+        % Draw the limit line
+        yline(limit(1),'-r','linewidth',2,'DisplayName','TVE Limit')
+        
+        title('Voltage TVE')
+        % Create ylabel
+        ylabel('TVE (%)');        
+        % Create xlabel
+        xlabel('Input Frequency (Hz)');
+        
+        ylim(axes1,[0 1.2]);
+        hold(axes1,'off');
+        % Set the remaining axes properties
+        set(axes1,'FontSize',6, 'YGrid', 'on');
+        % Create legend
+        lgd = legend(axes1,'show');
+        set(lgd,'Location','eastoutside');
+        set (lgd,'Position',self.lgdPos);
     end
     
+    % Create a formatted plot of the Current TVE
+    function fig = plotCurrentTVE(self,T,limit)
+        
+        lstCurrent = ["MaxTVE_IA" "MaxTVE_IB" "MaxTVE_IC" "MaxTVE_Ip"];  
+
+        % Create figure
+        fig = figure;            
+        set(fig,'Position',self.figPos);
+
+        % X and Y date
+        X1 = T{:,1};
+        YMatrix1 = zeros(4,size(T,1));
+        for ii = 1:numel(lstCurrent)
+            YMatrix1(ii,:) = T{:,lstCurrent(ii)};
+        end
+
+        
+        % Create axes
+        axes1 = axes('Parent',fig,...
+            'Position',self.axPos, 'YGrid', 'on');
+        hold(axes1,'on');
+       
+        % Create multiple lines using matrix input to plot
+        plot1 = plot(X1,YMatrix1,'LineWidth',2,'Parent',axes1);
+        set(plot1(1),'DisplayName','MaxTVE\_IA');
+        set(plot1(2),'DisplayName','MaxTVE\_IB');
+        set(plot1(3),'DisplayName','MaxTVE\_IC');
+        set(plot1(4),'DisplayName','MaxTVE\_I+');
+
+        % Draw the limit line
+        yline(limit(1),'-r','linewidth',2,'DisplayName','TVE Limit')
+        
+        title('Current TVE')
+        
+        % Create ylabel
+        ylabel('TVE (%)');
+        % Create xlabel
+        xlabel('Input Frequency (Hz)');
+
+        ylim(axes1,[0 1.2]);
+        hold(axes1,'off');
+        % Set the remaining axes properties
+        set(axes1,'FontSize',6,'YGrid','on');
+        % Create legend
+        lgd = legend(axes1,'show');
+        set(lgd,'Location','eastoutside');
+        set (lgd,'Position',self.lgdPos);
+    end
     
+    % Create a formatted plot of the Frequency Error
+    function fig = plotFrequencyError(self,T,limit)
+        
+        lstFE = ["MinFE", "MaxFE"];
+        
+        % Create figure
+        fig = figure;
+        set(fig,'Position',self.figPos);
+        
+        % X and Y data
+        X1 = T{:,1};
+        YMatrix1 = zeros(4,size(T,1));
+        for ii = 1:numel(lstFE)
+            YMatrix1(ii,:) = T{:,lstFE(ii)};
+        end
+        
+        % Create axes
+        axes1 = axes('Parent',fig,...
+            'Position',self.axPos, 'YGrid', 'on');        
+        hold(axes1,'on');
+        
+        % Create multiple lines using matrix input to plot
+        plot1 = plot(X1,YMatrix1,'-b','LineWidth',2,'Parent',axes1);
+        set(plot1(1),'DisplayName','Max\_FE');
+        set(plot1(2),'DisplayName','Min\_FE');
+       
+        % Draw the limit line
+        if isnumeric(limit)&& ~isinf(limit)
+            limLine = yline(limit(1),'-r','linewidth',2,'DisplayName','FE Limit');
+            yline(-limit(1),'-r','linewidth',2)
+            lgd = legend([plot1(1),plot1(2), limLine]);
+        else
+            lgd = legend([plot1(1),plot1(2)]);
+        end
+
+        
+        title('Frequency Error')
+        % Create ylabel
+        ylabel('FE (Hz)');        
+        % Create xlabel
+        xlabel('Input Frequency (Hz)');
+        
+        ylim(axes1,[-.006 .006]);
+        hold(axes1,'off');
+        % Set the remaining axes properties
+        set(axes1,'FontSize',6, 'YGrid', 'on');
+        % Create legend
+        set(lgd,'Location','eastoutside');
+        set (lgd,'Position',self.lgdPos);
+    end    
+    
+        % Create a formatted plot of the ROCOF Error
+    function fig = plotRocofError(self,T,limit)
+
+        lstRFE = ["MinRFE", "MaxRFE"];
+        
+        % Create figure
+        fig = figure;
+        set(fig,'Position',self.figPos);
+        
+        % X and Y data
+        X1 = T{:,1};
+       YMatrix1 = zeros(4,size(T,1));
+        for ii = 1:numel(lstRFE)
+            YMatrix1(ii,:) = T{:,lstRFE(ii)};
+        end
+         
+        % Create axes
+        axes1 = axes('Parent',fig,...
+            'Position',self.axPos, 'YGrid', 'on');        
+        hold(axes1,'on');
+        
+        % Create multiple lines using matrix input to plot
+        plot1 = plot(X1,YMatrix1,'-b','LineWidth',2,'Parent',axes1);
+        set(plot1(1),'DisplayName','Max\_RFE');
+        set(plot1(2),'DisplayName','Min\_RFE');
+       
+        % Draw the limit line
+        if isnumeric(limit)&& ~isinf(limit)
+            limLine = yline(limit(1),'-r','linewidth',2,'DisplayName','RFE Limit');
+            yline(-limit(1),'-r','linewidth',2)
+            lgd = legend([plot1(1),plot1(2), limLine]);
+        else
+            lgd = legend([plot1(1),plot1(2)]);
+        end
+       
+        title('ROCOF Error')
+        % Create ylabel
+        ylabel('RFE (Hz/S)');        
+        % Create xlabel
+        xlabel('Input Frequency (Hz)');
+        
+        ylim(axes1,[-1.5 1.5]);
+        hold(axes1,'off');
+        % Set the remaining axes properties
+        set(axes1,'FontSize',6, 'YGrid', 'on');
+        % Create legend
+        set(lgd,'Location','eastoutside');
+        set (lgd,'Position',self.lgdPos);
+    end    
+    
+    % from the sheet name, get the TVE, FE and RFE limits from the 
+    % specifications property
+    function Lim = getLimitsFromSheetName(self,sheetname)
+        switch sheetname
+            case 'frequency range'
+                Lim = self.specifications.FreqRng;
+                return
+                
+            case 'signal magnitude'
+                Lim = self.specifications.MagRng;
+                return
+                
+            case 'harmonic distortion'
+                Lim = self.specifications.Harm;
+                return
+                
+            case 'out of band interference'
+                Lim = self.specifications.OOB;
+                return
+                
+            case 'frequency ramp'
+                Lim = self.specifications.RampPos;
+                return
+                
+            case {'phase modulation', 'amplitude modulation', 'combined modulation'}
+                Lim = self.specifications.AmplMod;
+                return
+                
+            case {' amplitude step' 'phase step', 'combined step'}
+                Lim = [self.specifications.PhaseStepRespTime; self.specifications.PhaseStepDelayTime; self.specifications.PhaseStepOverShoot];
+                return
+                
+            otherwise
+                warning ('There are no known limits for %s', sheetname)
+        end
+        
+    end
+    
+    end 
 end
