@@ -1,4 +1,4 @@
-PCR = PmuCalReport('vNom',70,'iNom',5,'F0',50,'Fs',50);
+PCR = PmuCalReport('vNom',70,'iNom',5,'F0',60,'Fs',20,'PmuClass', 'P');
 PCR.getResultsFileList;
 PCR.makeReportFileName;
 PCR.makeNewReportFile;

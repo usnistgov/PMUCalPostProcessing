@@ -11,7 +11,7 @@ classdef PmuCalReport < handle
         resultPath
         paramFiles
         dataFiles
-        PmuClass
+        PmuClass = 'M'
         ReportFile
         vNom = 70
         iNom = 5
@@ -51,6 +51,8 @@ classdef PmuCalReport < handle
                         self.Fs = varargin{i+1};
                     case 'F0'
                         self.F0 = varargin{i+1};
+                    case 'PmuClass'
+                        self.PmuClass = varargin{i+1};
                     case 'Reset'    % delete the .ini file
                         b = varargin{i+1};
                         if b=="t" || b=="T"|| b=="true" || b=="True"
@@ -64,6 +66,7 @@ classdef PmuCalReport < handle
                 
             end
             
+            
             % program .ini file
             if ~exist(fullfile(appDataPath,name),'file')
                 self.resultPath = uigetdir(fullfile(getenv('USERPROFILE'),'Documents'),'Path to PMU results');
@@ -73,7 +76,7 @@ classdef PmuCalReport < handle
                 structure = self.ini2struct(fullfile(appDataPath,name));
                 self.resultPath = structure.ResultsPath.ResultsPath;
             end
-                            
+                                       
         end
     end
     
@@ -102,8 +105,8 @@ classdef PmuCalReport < handle
             self.dataFiles = dataNames;
             
           
-            prompt = sprintf('Choose the Class for selected F0 = %d, Fs = %d results',self.F0,self.Fs);
-            self.PmuClass = questdlg(prompt,'Choose PMU Class','M','P','M');
+            %prompt = sprintf('Choose the Class for selected F0 = %d, Fs = %d results',self.F0,self.Fs);
+            %self.PmuClass = questdlg(prompt,'Choose PMU Class','M','P','M');
             
             % getting the specifications for the selected PMU configuration
             absPath = mfilename('fullpath');
@@ -116,6 +119,9 @@ classdef PmuCalReport < handle
                 error ('Failed to read  specifications file %s,',absPath);
             end
                                    
+             % Dialog to verify the correct PMU configuration
+             dlg = dlgConfig(self, num2str(self.F0), num2str(self.Fs), self.PmuClass);
+             waitfor(dlg)
             
             % TODO: Update the .ini file with the latest Raw Data Path
                         
