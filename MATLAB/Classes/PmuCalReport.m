@@ -120,7 +120,7 @@ classdef PmuCalReport < handle
             end
                                    
              % Dialog to verify the correct PMU configuration
-             dlg = dlgConfig(self, num2str(self.F0), num2str(self.Fs), self.PmuClass);
+             dlg = dlgConfig(self, num2str(self.F0), num2str(self.Fs), self.PmuClass, self.resultPath);
              waitfor(dlg)
             
             % TODO: Update the .ini file with the latest Raw Data Path
