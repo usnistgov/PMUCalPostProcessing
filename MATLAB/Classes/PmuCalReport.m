@@ -204,20 +204,50 @@ classdef PmuCalReport < handle
               self.hExcel.ActivateSheet(i);
               sheetName = self.hExcel.hSheet.Name;
               T = readtable(self.ReportFile,'Sheet',sheetName,'PreserveVariableNames',true);
+              
+              % from the influence factor columns (first or second) we need
+              % to determine the X axis labels or the plots
+              xLabel = strings(2,1);
+              infl = T.Properties.VariableNames;
+                switch infl{1}
+                    case 'Fin'
+                        xLabel(:) = "Frequency (Hz)";
+                    case 'Kv'
+                        xLabel(1) = "Voltage Index (% of nominal)";
+                        xLabel(2) = "Current Index (% of nominal)";
+                    case 'Fh'
+                        xLabel(:) = "Interfering Signal Frequency (Hz)";
+                        % if it is interharmonics, we want to find the gap
+                        % on either side of the nominal frequency
+                        mask = T.Fh<self.F0;
+                        tNaN = NaN(1,width(T));
+                        tNaN = array2table(tNaN);
+                        tNaN.Properties.VariableNames = T.Properties.VariableNames;
+                        T = [T(mask,:);tNaN;T(~mask,:)];
+                    case {'Fa' 'Fx'}
+                        xLabel(:) = "Modulation Frequency (Hz)";
+                        
+                    otherwise
+                        xLabel(:)= "Frequency (Hz)";
+                        warning ('Influence factor label not recognized, using Frequency');
+                end
+              
+              
+              
               Lim = self.getLimitsFromSheetName(sheetName);
               
               % Create a new sheet 
               self.hExcel.NewSheet(strcat(sheetName,' plots'))              
-              fig = self.plotVoltageTVE(T,Lim(1));
+              fig = self.plotVoltageTVE(T,Lim(1),xLabel(1));
               self.hExcel.WriteData(fig,'B2')
               close(fig)
-              fig = self.plotCurrentTVE(T,Lim(1));
+              fig = self.plotCurrentTVE(T,Lim(1),xLabel(2));
               self.hExcel.WriteData(fig,'H2')
                close(fig)
-              fig = self.plotFrequencyError(T,Lim(2));
+              fig = self.plotFrequencyError(T,Lim(2),xLabel(2));
               self.hExcel.WriteData(fig,'B16')
               close(fig)
-              fig = self.plotRocofError(T,Lim(3));
+              fig = self.plotRocofError(T,Lim(3),xLabel(2));
               self.hExcel.WriteData(fig,'H16')
               close(fig)
             
@@ -531,7 +561,7 @@ classdef PmuCalReport < handle
                 % there is a special case here.  If the current active sheet 
                 % is "signal magnitude, and Kv and Ki are both nominal, then this is 
                 % a signal magnitude test case.
-                if b == 0;
+                if b == 0
                     sheetName = self.hExcel.hSheet.Name;
                     if sheetName == "signal magnitude"
                         b = 1;
@@ -558,34 +588,34 @@ classdef PmuCalReport < handle
                                 sheetName = 'out of band interference';
                         end
                 end
-                
-            case 1 %Ramp
-                sheetName = 'frequency ramp';
-                idx = tabIdx(T,'Fin');
-                influenceFactor = T(1,idx);
-                idx = tabIdx(T,'dF');
-                influenceFactor = [influenceFactor, T(1,idx)];
-                
-            case 2 % modulation
+                                
+            case 1 % modulation
                 b = [T.Kx(1)~=0, T.Ka(1)~=0];
                 b = bindec(b);
                 switch b
                     case 1
                         sheetName = 'phase modulation';
-                        idx = tabIdx(T,'Ka');
+                        idx = tabIdx(T,'Fa');
                         influenceFactor = T(1,idx);
                     case 2
                         sheetName = 'amplitude modulation';
-                        idx = tabIdx(T,'Ka');
+                        idx = tabIdx(T,'Fx');
                         influenceFactor = T(1,idx);
                     otherwise
                         sheetName = 'combined modulation';
-                        idx = tabIdx(T,'Ka');
+                        idx = tabIdx(T,'Fa');
                         influenceFactor = T(1,idx);
-                        idx = tabIdx(T,'Kx');
+                        idx = tabIdx(T,'Fx');
                         influenceFactor = [influenceFactor, T(1,idx)];
                 end
-                
+
+            case 2 %Ramp
+                sheetName = 'frequency ramp';
+                idx = tabIdx(T,'Fin');
+                influenceFactor = T(1,idx);
+                idx = tabIdx(T,'dF');
+                influenceFactor = [influenceFactor, T(1,idx)];
+                                
             case 3 % step
                 b = [T.Kas(1)~=0, T.Kxs (1)~=0, T.KfS(1)~=0, T.KrS(1)~=0];
                 b = bindec(b);
@@ -624,7 +654,7 @@ classdef PmuCalReport < handle
     end
     
     % Create a formatted plot of the Voltage TVE
-    function fig = plotVoltageTVE(self,T,limit)
+    function fig = plotVoltageTVE(self,T,limit,xLabel)
         
         lstVoltage = ["MaxTVE_VA" "MaxTVE_VB" "MaxTVE_VC" "MaxTVE_Vp"];
 
@@ -659,9 +689,10 @@ classdef PmuCalReport < handle
         % Create ylabel
         ylabel('TVE (%)');        
         % Create xlabel
-        xlabel('Input Frequency (Hz)');
+        xlabel(xLabel);
         
-        ylim(axes1,[0 1.2]);
+        ylimit = max([max(max(YMatrix1')),(1.1*limit(1))]);
+        ylim(axes1,[0 ylimit]);
         hold(axes1,'off');
         % Set the remaining axes properties
         set(axes1,'FontSize',6, 'YGrid', 'on');
@@ -672,7 +703,7 @@ classdef PmuCalReport < handle
     end
     
     % Create a formatted plot of the Current TVE
-    function fig = plotCurrentTVE(self,T,limit)
+    function fig = plotCurrentTVE(self,T,limit,xLabel)
         
         lstCurrent = ["MaxTVE_IA" "MaxTVE_IB" "MaxTVE_IC" "MaxTVE_Ip"];  
 
@@ -708,9 +739,10 @@ classdef PmuCalReport < handle
         % Create ylabel
         ylabel('TVE (%)');
         % Create xlabel
-        xlabel('Input Frequency (Hz)');
+        xlabel(xLabel);
 
-        ylim(axes1,[0 1.2]);
+        ylimit = max([max(max(YMatrix1')),(1.1*limit(1))]);
+        ylim(axes1,[0 ylimit]);
         hold(axes1,'off');
         % Set the remaining axes properties
         set(axes1,'FontSize',6,'YGrid','on');
@@ -721,7 +753,7 @@ classdef PmuCalReport < handle
     end
     
     % Create a formatted plot of the Frequency Error
-    function fig = plotFrequencyError(self,T,limit)
+    function fig = plotFrequencyError(self,T,limit,xLabel)
         
         lstFE = ["MinFE", "MaxFE"];
         
@@ -731,7 +763,7 @@ classdef PmuCalReport < handle
         
         % X and Y data
         X1 = T{:,1};
-        YMatrix1 = zeros(4,size(T,1));
+        YMatrix1 = zeros(2,size(T,1));
         for ii = 1:numel(lstFE)
             YMatrix1(ii,:) = T{:,lstFE(ii)};
         end
@@ -760,9 +792,10 @@ classdef PmuCalReport < handle
         % Create ylabel
         ylabel('FE (Hz)');        
         % Create xlabel
-        xlabel('Input Frequency (Hz)');
+        xlabel(xLabel);
         
-        ylim(axes1,[-.006 .006]);
+        ylimit = max([max(max(abs(YMatrix1)')),(1.1*limit(1))]);
+        ylim(axes1,[-ylimit ylimit]);
         hold(axes1,'off');
         % Set the remaining axes properties
         set(axes1,'FontSize',6, 'YGrid', 'on');
@@ -772,7 +805,7 @@ classdef PmuCalReport < handle
     end    
     
         % Create a formatted plot of the ROCOF Error
-    function fig = plotRocofError(self,T,limit)
+    function fig = plotRocofError(self,T,limit,xLabel)
 
         lstRFE = ["MinRFE", "MaxRFE"];
         
@@ -782,7 +815,7 @@ classdef PmuCalReport < handle
         
         % X and Y data
         X1 = T{:,1};
-       YMatrix1 = zeros(4,size(T,1));
+        YMatrix1 = zeros(2,size(T,1));
         for ii = 1:numel(lstRFE)
             YMatrix1(ii,:) = T{:,lstRFE(ii)};
         end
@@ -810,9 +843,10 @@ classdef PmuCalReport < handle
         % Create ylabel
         ylabel('RFE (Hz/S)');        
         % Create xlabel
-        xlabel('Input Frequency (Hz)');
+        xlabel(xLabel);
         
-        ylim(axes1,[-1.5 1.5]);
+        ylimit = max([max(max(abs(YMatrix1)')),(1.1*limit(1))]);
+        ylim(axes1,[-ylimit ylimit]);
         hold(axes1,'off');
         % Set the remaining axes properties
         set(axes1,'FontSize',6, 'YGrid', 'on');

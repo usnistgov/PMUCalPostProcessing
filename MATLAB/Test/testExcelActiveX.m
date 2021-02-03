@@ -18,9 +18,9 @@ classdef testExcelActiveX < matlab.unittest.TestCase
     methods(Test)
         function regressionTests (testCase)
             %testOpenCloseApplication(testCase);
-            %testNewSheet(testCase)
-            %testWriteFigure(testCase);
-            testRanges(testCase);
+            testNewSheet(testCase)
+            testWriteFigure(testCase);
+            %testRanges(testCase);
             
         end
         
