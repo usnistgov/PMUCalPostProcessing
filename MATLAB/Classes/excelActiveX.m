@@ -324,7 +324,6 @@ classdef excelActiveX < handle
                 if isempty(varargin)
                     addr = 'A1';
                 elseif ischar(varargin{1})
-                    %addr = XRangeAddress([1,1],varargin{1});
                     addr = varargin{1};
                 end
                 % copy content of figure to clipboard using hgexport
@@ -340,16 +339,55 @@ classdef excelActiveX < handle
                     ME  = MException(ME.identifier,[ME.message,msg]);
                     throw(ME);
                 end
-                % It's a table.
+                
+                
+            % It's a table.  Write out the table and its headers starting at addr
             elseif isa(data,'table')
-                self.hSheet.Value(self.hSheet.Range(addr)) = data;
+                
+                % We will need to make a range including the data dimension and
+                % a row for the header
+                
+                % get the starting address
+                if isempty(varargin)
+                    addr = 'A1';
+                elseif ischar(varargin{1})
+                    addr = varargin{1};
+                else
+                    error('invalid excel address format')
+                end
+                
+                % First write the header line
+                hdr = data.Properties.VariableNames;
+                [col,row] = self.separateAddress(addr); %Separate the column and row
+                endCol = self.letters2nums(col)+numel(hdr)-1;
+                nLine = self.num2letters(endCol);  %Excel column of the end                                
+                rng = strcat(addr,':',nLine, num2str(row(1)));                
+                self.AddRange('addr','Cells',rng{1});
+                self.WriteRange('addr',hdr(1,:));
+                
+                % Next write the table data to the lines below the header
+                dataStartRow = row(1)+1;
+                dataEndRow = dataStartRow + size(data{:,:},1)-1;
+                rng = strcat(col{1},num2str(dataStartRow),':',nLine, num2str(dataEndRow));
+                self.AddRange('addr','Cells',rng{1});
+                self.rangeTable.addr.Value = data{:,:};
             end
             
             
         end
         
+        % ask the user where to put the reports
+        function getReportPath(self)
+            self.filePath = uigetdir('.','Path to report files');
+        end
+         
+    end
+    
+ %-------------------------------------------------------------------------
+ methods (Static)
+        
         % Convert a number into its albhabetic base-26 representaton
-        function lets = num2letters(self,nums)
+        function lets = num2letters(nums)
             lets = arrayfun(@(n)num2char(n),nums,'UniformOutput',0);
             function s = num2char(d)
                 b = 26;
@@ -377,16 +415,15 @@ classdef excelActiveX < handle
             end
         end
         
-        function nums = letters2nums(self,lets)
+        function nums = letters2nums(lets)
             nums = cellfun(@(x) (sum((double(x)-64).*26.^(length(x)-1:-1:0))),lets);            
         end
         
-        
-        % ask the user where to put the reports
-        function getReportPath(self)
-            self.filePath = uigetdir('.','Path to report files');
+        function [lets,nums] = separateAddress(addr)
+            lets = regexp(addr,'[\D.]+','match');
+            nums = str2double(regexp(addr,'[\d.]+','match'));        
         end
-                
+               
 
     end
     
