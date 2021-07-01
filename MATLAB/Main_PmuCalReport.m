@@ -3,4 +3,4 @@ PCR.getResultsFileList;
 PCR.makeReportFileName;
 PCR.makeNewReportFile;
 PCR.writeAnalysisToExcel;
-%PCR.plotExcelAnalysis;
+PCR.plotExcelAnalysis;
