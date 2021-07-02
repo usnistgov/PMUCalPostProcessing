@@ -92,8 +92,8 @@ classdef PmuCalReport < handle
     methods (Access = public)
         self = getResultsFileList(self)
         self = makeReportFileName(self)
-        self = makeNewReportFile(self)
-        self = writeAnalysisToExcel(self)
+        makeNewReportFile(self)
+        writeAnalysisToExcel(self)
         plotExcelAnalysis(self)
 
     end
@@ -107,6 +107,7 @@ classdef PmuCalReport < handle
         [nextLine] = writeResultsToExcel(self,nextLine,i,new,influenceFactor)
         plotResults(self,T,Lim,xLabel)
         plotStepResults(self,T,Lim,xLabel)
+        [Results] = plotStepOsUs(self,X1,PMUData,RefData,displayNames,fig,limit)
     end
     
     

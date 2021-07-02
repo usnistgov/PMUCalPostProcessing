@@ -1,4 +1,4 @@
-function self = makeNewReportFile(self)
+function makeNewReportFile(self)
 % Creates a new Excel file 
 
 self.hExcel = excelActiveX;      % consruct an excel object

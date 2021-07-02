@@ -1,4 +1,4 @@
-function self = writeAnalysisToExcel(self)
+function writeAnalysisToExcel(self)
 %Loop through all the data and param files, creating and adding data to sheets
 
 i = 1;

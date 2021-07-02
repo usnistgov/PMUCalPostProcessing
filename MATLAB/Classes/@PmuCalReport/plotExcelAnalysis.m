@@ -25,8 +25,6 @@ for i = nSheets:-1:1
             plotResults(self,T,Lim,xLabel)
             
     end
-        
-    
     
 end
 end
